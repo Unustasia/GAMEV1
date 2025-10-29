@@ -101,62 +101,131 @@ label game_in_kitchen:
     "Эти тарелки... они... они мне очень дороги."
     call screen plates 
 
-# Импортируем логику игры
-python:
-    from hanoi_logic import HanoiGame
-    game = HanoiGame()
+# Инициализация переменных
+init python:
+    import random
 
-# Экран игры (разрешение 1920x1080)
-screen hanoi_game():
-    frame:
-        background "black.png"  # фон (должен быть в папке game/images/)
-        vbox:
-            text "Ханойская башня" size 48 color "#fff" xalign 0.5
-            text "Переместите все кольца на правый столб!" color "#ccc" xalign 0.5
-            text f"Ходы: {game.moves}" color "#fff" xalign 0.5
+    # Список книг и правильный порядок
+    books = ["book_a", "book_b", "book_c"]
+    target_order = ["book_a", "book_b", "book_c"]  # нужный порядок слева направо
 
-            # Столбы с кольцами (ширина экрана ~1920, 3 столба + отступы)
-            hbox xalign 0.5 spacing 400:
-                for i in range(3):
-                    vbox:
-                        imagebutton:
-                            image "pole.png"  # изображение столба (ширина ~100px, высота ~500px)
-                            action Python("game.select_pole(%d)" % i)
-                        # Кольца (от нижнего к верхнему)
-                        for ring in reversed(game.poles[i]):
-                            image f"ring{ring}.png"  # изображения колец разного размера (ширина ~100-300px)
 
-            # Кнопки управления (внизу экрана)
-            if game.selected_pole is None:
-                textbutton "Выбрать исходный столб" action Null()
-            else:
-                textbutton "Переместить →" xalign 0.5 ypos 800 action Python("result, message = game.move_ring(); renpy.notify(message); renpy.restart_interaction()")
+    # Начальные позиции книг (случайные)
+    book_positions = {}
+    for book in books:
+        book_positions[book] = {
+            "x": random.randint(200, 1600),  # случайная x в пределах экрана
+            "y": random.randint(200, 500),   # случайная y вверху экрана
+            "dragging": False,
+            "in_zone": False
+        }
 
-# Метка для проверки победы
-label check_win:
+    # Координаты зон на полке (3 места, выровнены по центру)
+    shelf_zones = [
+        (600, 750),  # зона 1 (левая)
+        (960, 750),  # зона 2 (центральная)
+        (1320, 750)  # зона 3 (правая)
+    ]
+
+    # Флаг победы
+    game_won = False
+
+# Экран игры
+screen sort_books:
+    # Фон — полка (центрируется)
+    add "2.png" xalign 0.5 yalign 0.5
+
+
+    # Подсветка зон (если хотите видеть места)
+    for i, (zx, zy) in enumerate(shelf_zones):
+        if not game_won:
+            add "back.png" xpos zx ypos zy anchor (0.5, 0.5)
+
+
+    # Книги — перетаскиваемые объекты
+    for book in books:
+        $ pos = book_positions[book]
+        draggable:
+            id book
+            xpos pos["x"]
+            ypos pos["y"]
+            draggable True
+            drag_offset (0, 0)
+            drag_transform True
+
+            image book + ".png"
+
+
+            # События перетаскивания
+            event "dragstart":
+                python:
+                    pos["dragging"] = True
+            event "dragend":
+                python:
+                    pos["dragging"] = False
+                    # Проверяем, попала ли книга в одну из зон
+                    closest_zone = None
+                    min_dist = 9999
+                    for i, (zx, zy) in enumerate(shelf_zones):
+                        dist = ((pos["x"] - zx)**2 + (pos["y"] - zy)**2)**0.5
+                        if dist < min_dist:
+                            min_dist = dist
+                            closest_zone = i
+
+                    if min_dist < 120:  # радиус «прилипания» к зоне
+                        pos["x"] = shelf_zones[closest_zone][0]
+                        pos["y"] = shelf_zones[closest_zone][1]
+                        pos["in_zone"] = True
+                    else:
+                        # Возвращаем на случайную позицию вверху
+                        pos["x"] = random.randint(200, 1600)
+                        pos["y"] = random.randint(200, 500)
+                        pos["in_zone"] = False
+
+
+    # Сообщение о победе (появляется, когда все книги на местах)
+    if game_won:
+        text "Все книги на месте! Отлично!" size 48 color "#fff" xalign 0.5 ypos 200
+        text "(Можно продолжить игру или перейти дальше)" size 28 color "#ccc" xalign 0.5 ypos 260
+
+
+# Логика проверки порядка
+label check_order:
     python:
-        if game.is_won():
-            renpy.notify(f"Победа! Вы решили задачу за {game.moves} ходов.")
-            jump game_over
-        else:
-            jump continue_game
+        # Собираем книги, которые стоят в зонах, по порядку зон
+        placed = []
+        for zx, zy in shelf_zones:
+            for book in books:
+                pos = book_positions[book]
+                if (abs(pos["x"] - zx) < 10 and abs(pos["y"] - zy) < 10
+                        and pos["in_zone"]):
+                    placed.append(book)
+                    break
 
-# Метка завершения игры
-label game_over:
-    text "Игра завершена!" size 36 color "#fff" xalign 0.5
-    textbutton "Начать заново" action Python("game.reset(); renpy.restart_interaction()")
-    textbutton "Вернуться в меню" action Jump("main_menu")
+        # Если все 3 книги в зонах и в нужном порядке — победа
+        if len(placed) == 3 and placed == target_order:
+            global game_won
+            game_won = True
 
-# Запуск игры
+    # Перерисовываем экран
+    show screen sort_books
+    return
+
+# Основной ярлык запуска
 label game:
-    show screen hanoi_game()
-    jump check_win
+    $ game_won = False
+    show screen sort_books
 
-# Метка главного меню (пример)
-label game:
-    text "Меню" size 48 color "#fff" xalign 0.5
-    textbutton "Начать игру" action Jump("game")
-    textbutton "Выход" action Jump("quit")
+    # Цикл проверки порядка, пока не выиграем
+    while not game_won:
+        pause 0.2
+        jump check_order
+
+    # Игра завершена
+    pause 2.5
+    hide screen sort_books
+    jump pic_in_kitchen  # переход к следующей сцене
+
 
 
 label pic_in_kitchen:
