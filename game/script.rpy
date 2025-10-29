@@ -1,4 +1,4 @@
-# Определение персонажей игры.
+﻿# Определение персонажей игры.
 define e = Character('Незнакомка', color="#291246")
 
 # Игра начинается здесь:
@@ -101,62 +101,72 @@ label game_in_kitchen:
     "Эти тарелки... они... они мне очень дороги."
     call screen plates 
 
-# Импортируем логику игры
-python:
-    from hanoi_logic import HanoiGame
-    game = HanoiGame()
+# Изображения книг и полки
+image book1 = "images/book1.png"
+image book2 = "images/book2.png"
+image book3 = "images/book3.png"
+image shelf = "images/shelf.png"  # Фон-полка (1920×1080)
 
-# Экран игры (разрешение 1920x1080)
-screen hanoi_game():
-    frame:
-        background "black.png"  # фон (должен быть в папке game/images/)
-        vbox:
-            text "Ханойская башня" size 48 color "#fff" xalign 0.5
-            text "Переместите все кольца на правый столб!" color "#ccc" xalign 0.5
-            text f"Ходы: {game.moves}" color "#fff" xalign 0.5
-
-            # Столбы с кольцами (ширина экрана ~1920, 3 столба + отступы)
-            hbox xalign 0.5 spacing 400:
-                for i in range(3):
-                    vbox:
-                        imagebutton:
-                            image "pole.png"  # изображение столба (ширина ~100px, высота ~500px)
-                            action Python("game.select_pole(%d)" % i)
-                        # Кольца (от нижнего к верхнему)
-                        for ring in reversed(game.poles[i]):
-                            image f"ring{ring}.png"  # изображения колец разного размера (ширина ~100-300px)
-
-            # Кнопки управления (внизу экрана)
-            if game.selected_pole is None:
-                textbutton "Выбрать исходный столб" action Null()
-            else:
-                textbutton "Переместить →" xalign 0.5 ypos 800 action Python("result, message = game.move_ring(); renpy.notify(message); renpy.restart_interaction()")
-
-# Метка для проверки победы
-label check_win:
+# Инициализация игры
+init:
     python:
-        if game.is_won():
-            renpy.notify(f"Победа! Вы решили задачу за {game.moves} ходов.")
-            jump game_over
-        else:
-            jump continue_game
+        def reset_game():
+            import random
+            global book_order
+            book_order = [1, 2, 3]
+            random.shuffle(book_order)  # Случайный порядок
+            global selected_book
+            selected_book = None  # Выбранная книга для обмена
 
-# Метка завершения игры
-label game_over:
-    text "Игра завершена!" size 36 color "#fff" xalign 0.5
-    textbutton "Начать заново" action Python("game.reset(); renpy.restart_interaction()")
-    textbutton "Вернуться в меню" action Jump("main_menu")
+        reset_game()
+
+# Экран головоломки
+screen book_puzzle():
+    # Фон — полка
+    add "shelf"
+
+    # Позиции книг (горизонтально, центрировано)
+    $ x_pos = [600, 900, 1200]  # Координаты X для 3 книг
+    $ y = 500  # Координата Y
+
+    for i in range(3):
+        $ book_id = book_order[i]
+        $ img = "book{}".format(book_id)
+        $ x = x_pos[i]
+
+        imagebutton:
+            idle img
+            hover img
+            xpos x
+            ypos y
+            action [SetVariable("selected_book", i), Call("swap_books")]
+
+    # Сообщение о победе
+    if book_order == [1, 2, 3]:
+        text "Победа!" size 60 color "#fff" xalign 0.5 yalign 0.3
+
+        textbutton "Начать заново":
+            xalign 0.5
+            yalign 0.4
+            action [Python("reset_game()"), Redraw()]
+
+# Логика обмена книг
+label swap_books:
+    $ if selected_book is not None:
+        $ other_book = selected_book
+        $ selected_book = None
+
+        # Обмен позиций в списке
+        $ book_order[other_book], book_order[selected_book] = book_order[selected_book], book_order[other_book]
+        $ renpy.redraw()  # Перерисовка экрана
+
+    return
 
 # Запуск игры
-label game:
-    show screen hanoi_game()
-    jump check_win
+label start:
+    show screen book_puzzle
+    pause
 
-# Метка главного меню (пример)
-label game:
-    text "Меню" size 48 color "#fff" xalign 0.5
-    textbutton "Начать игру" action Jump("game")
-    textbutton "Выход" action Jump("quit")
 
 
 label pic_in_kitchen:
