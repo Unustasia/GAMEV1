@@ -1,8 +1,6 @@
 # Определение персонажей игры.
 define e = Character('Незнакомка', color="#291246")
 
-
-
 # Игра начинается здесь:
 label start:
 
@@ -11,9 +9,9 @@ label start:
     $ flag_for_pic = 1
     $ sum_in_wardrobe = 1
     $ flag_for_key = 1
+    $ flag_for_game_in_kitchen = 1
 
 # Все функции которые будут использоваться в игре:
-
 
     python:
         def show_image(x):
@@ -29,13 +27,9 @@ label start:
             
             return image_map.get(x, None)
 
-
-
-
     jump act1
-#Все локации которые будут использоваться в игре:
 
-#Спальня с книпками
+#Все локации которые будут использоваться в игре:
 
 screen bedroom_map():
     imagemap:
@@ -52,10 +46,11 @@ screen bedroom_map():
 #        hotspot (1390, 988, 530, 92) action If(flag_for_key == 1, Notify("Дверь заперта."), Jump("basement"))
         hotspot (1390, 988, 530, 92) action Jump("hallway")
 
-
 label pic_in_bed:
     scene bedroom
-    show pic
+    show pic:
+        xalign 0.45
+        yalign 0.5
     "Это… кто эти люди? Почему фотография здесь? Они имеют ко мне отношение?"
     "Дети… Они вызывают тревогу. Почему?"
     hide pic
@@ -73,64 +68,113 @@ label key:
     $ flag_for_key = 0
     jump bedroom
 
-screen hallway_map:
+screen hallway_map():
     imagemap:
         idle "hallway"
         hover "hallway2"
 
 
-        hotspot (191, 191, 250, 400) action Jump("bedroom")
-        hotspot (1390, 988, 530, 92) action If(flag_for_key == 1, Notify("Дверь заперта."), Jump("basement"))
-#        hotspot (191, 191, 250, 400) action If(flag_for_pic == 0, Notify("Не могу больше смотреть на эти лица."), Jump("pic_in_bed"))
-
+        hotspot (640, 280, 300, 600) action Jump("bedroom")
+        hotspot (1450, 50, 470, 1020) action If(flag_for_key == 1, Notify("Дверь заперта."), Jump("basement"))
+        hotspot (1, 1, 400, 1080) action Jump("kitchen")
 
 screen kitchen_map():
     imagemap:
-        idle "basement"
+        idle "kitchen"
         hover "kitchen2"
 
-        hotspot (1, 900, 400, 180) action Jump("bedroom") alt "Swimming"
+        hotspot (1, 900, 400, 180) action Jump("hallway")
+        hotspot (1350, 300, 1500, 600) action Jump("game_in_kitchen")
+#        If(flag_for_game_in_kitchen == 1, hotspot (1350, 300, 1500, 600) action Jump("game_in_kitchen"))
 
-#Интерактивные кнопки в спальне:
+screen plates():
+    imagemap:
+        idle "ware"
+        hover "ware2"
 
-#Кровать
-#    call screen bed_button
+        hotspot (300, 300, 900, 500) action Jump("game")
+        hotspot (1, 750, 500, 330) action Jump("kitchen")
 
-#label bed:
-#    screen bed_button():
-#        frame:
-#            xpos 1 
-#            ypos 600
-#            button:
-#                add "bed.png"
-#                action Notify("Я не устал.")
-#                hovered Notify("Кровать.")
+label game_in_kitchen:
+    scene ware
+    "За тарелками лежит что-то. Не могу достать."
+    "Эти тарелки... они... они мне очень дороги."
+    call screen plates 
 
-#Окно
-#    call screen window_in_bedroom_button
+# Импортируем логику игры
+python:
+    from hanoi_logic import HanoiGame
+    game = HanoiGame()
 
-#label window_in_bedroom:
-#    screen window_in_bedroom_button():
-#        frame:
-#            xpos 800 
-#            ypos 200
-#            button:
-#                add "window_in_bed.png"
-#                action Jump("window_in_bedroom_big")
-#                hovered Notify("Окно.")
+# Экран игры (разрешение 1920x1080)
+screen hanoi_game():
+    frame:
+        background "black.png"  # фон (должен быть в папке game/images/)
+        vbox:
+            text "Ханойская башня" size 48 color "#fff" xalign 0.5
+            text "Переместите все кольца на правый столб!" color "#ccc" xalign 0.5
+            text f"Ходы: {game.moves}" color "#fff" xalign 0.5
 
-#Вернуться обратно в спальню
-#    call screen windowsill_in_bedroom_button
+            # Столбы с кольцами (ширина экрана ~1920, 3 столба + отступы)
+            hbox xalign 0.5 spacing 400:
+                for i in range(3):
+                    vbox:
+                        imagebutton:
+                            image "pole.png"  # изображение столба (ширина ~100px, высота ~500px)
+                            action Python("game.select_pole(%d)" % i)
+                        # Кольца (от нижнего к верхнему)
+                        for ring in reversed(game.poles[i]):
+                            image f"ring{ring}.png"  # изображения колец разного размера (ширина ~100-300px)
 
-#label windowsill_in_window:
-#    screen windowsill_in_bedroom_button():
-#        frame:
-#            xpos 1 
-#            ypos 900
-#            button:
-#                add "windowsill.png"
-#                action Jump("bedroom")
-#                hovered Notify("Спальня.")
+            # Кнопки управления (внизу экрана)
+            if game.selected_pole is None:
+                textbutton "Выбрать исходный столб" action Null()
+            else:
+                textbutton "Переместить →" xalign 0.5 ypos 800 action Python("result, message = game.move_ring(); renpy.notify(message); renpy.restart_interaction()")
+
+# Метка для проверки победы
+label check_win:
+    python:
+        if game.is_won():
+            renpy.notify(f"Победа! Вы решили задачу за {game.moves} ходов.")
+            jump game_over
+        else:
+            jump continue_game
+
+# Метка завершения игры
+label game_over:
+    text "Игра завершена!" size 36 color "#fff" xalign 0.5
+    textbutton "Начать заново" action Python("game.reset(); renpy.restart_interaction()")
+    textbutton "Вернуться в меню" action Jump("main_menu")
+
+# Запуск игры
+label game:
+    show screen hanoi_game()
+    jump check_win
+
+# Метка главного меню (пример)
+label game:
+    text "Меню" size 48 color "#fff" xalign 0.5
+    textbutton "Начать игру" action Jump("game")
+    textbutton "Выход" action Jump("quit")
+
+
+label pic_in_kitchen:
+    scene black #shelf_end
+    show pic:
+        xalign 0.45
+        yalign 0.5
+    "Ебать... газета.. нихуя себе"
+    hide pic
+    $ flag_for_game_in_kitchen = 0
+    jump kitchen
+
+screen basement_map():
+    imagemap:
+        idle "basement"
+        hover "basement"
+
+        hotspot (1, 900, 400, 180) action Jump("hallway")
 
 #Bedroom — комната, где просыпается герой
 
@@ -140,37 +184,16 @@ label bedroom:
 label hallway:
     call screen hallway_map
 
-#label window_in_bedroom_big:
-
-#    scene window_bg
-
-#    call screen windowsill_in_bedroom_button
-
-#    pause (None)
-    #девушка
-    #таблетка
-    #дверь
-
-
 #Если у игрока есть какие-то данные он сможет подойти к девушке
 #Откроется новый скрипт а так он может свободно
 #Передвигаться по дому
 
-#Basement — место со следами крови
-
 label basement:
-
-
-
-#Attic — возможное место хранения старых вещей
+    call screen basement_map
 
 label attic:
 
-#Study — место, где хранятся документы и дневник
-
 label study:
-
-#Kitchen — место, где герой может найти лекарства
 
 label kitchen:
 
@@ -178,15 +201,9 @@ label kitchen:
 
 label livingroom:
 
-
-
-#Bathroom лекарства
-
 label bathroom:
 
 label kidsbedroom:
-
-
 
 #Акт 1. Пробуждение
 
@@ -202,16 +219,12 @@ label act1:
 
     play music "dark.mp3" #loop=True
 
-
-    
     #Сцена 1. Первое пробуждение
     #Заброшенный дом в деревне. Полумрак. Герой лежит на кровати, рядом разбросаны медицинские инструменты. В комнате пахнет лекарствами.
 
-    #Герой (приоткрывает глаза, хватается за голову): 
     "Где я? Кто я? Почему вокруг столько незнакомых вещей? Я… я даже не помню своего имени."
-
     "Что это за место? Дом? Больница? Или…"
-    #Незнакомка (входит с чашкой, мягко): 
+
     show sorry:
         xalign 0.8
         yalign 1.0
@@ -273,50 +286,24 @@ label choice1_done:
     e "..."
     e "Вы не ранены, но ваш разум… он словно закрыт. Это пройдёт. Постепенно."
 
-    #Герой: 
     "Сколько я был без сознания? Дни? Недели?"
-
-    #Незнакомка: 
 
     e "Недолго. Но вам нужно отдохнуть. Ваши воспоминания вернутся — постепенно."
     e "Сейчас главное — спокойствие."
 
-    #Герой: 
     "Но я должен знать! Что со мной случилось? Почему я здесь?"
-
-    #Незнакомка: 
 
     e "Ваш разум защищает вас. Возможно, он прячет то, что пока не готов показать. Давайте не торопиться."
 
-
-
-#    call screen example_screen
-
-#label news:
-#    screen example_screen():
-    # Создаём imagebutton с изображением для состояния idle и hover
-#        imagebutton:
-#            idle "news.png"  # Изображение для состояния покоя
-#            hover "newsb.png"  # Изображение для состояния наведения
-#            action Jump("choice_death")  # Действие при нажатии
-#            xpos 100  # Позиция по X
-#            ypos 100  # Позиция по Y
- 
-            
-    #Герой: 
     "А если я не хочу ждать? Если я боюсь, что никогда не вспомню?"
 
-    #Незнакомка: 
     e "Страх — это часть пути. Но вы сильнее, чем думаете. Даже если сейчас вам кажется иначе."
-
 
     jump bedroom
 
 
 
 #Здесь будут концовки:
-
-#Смерть... Странный выбор...
 
 label choice_death:
 
