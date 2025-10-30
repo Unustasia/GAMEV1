@@ -10,6 +10,7 @@ label start:
     $ sum_in_wardrobe = 1
     $ flag_for_key = 1
     $ flag_for_game_in_kitchen = 1
+    $ flag_for_mirror = 0
 
 # Все функции которые будут использоваться в игре:
 
@@ -77,6 +78,7 @@ screen hallway_map():
         hotspot (640, 280, 300, 600) action Jump("bedroom")
         hotspot (1450, 50, 470, 1020) action If(flag_for_key == 1, Notify("Дверь заперта."), Jump("basement"))
         hotspot (1, 1, 400, 1080) action Jump("kitchen")
+        hotspot (700, 900, 400, 180) action Jump("bathroom")
 
 screen kitchen_map():
     imagemap:
@@ -92,7 +94,7 @@ screen plates():
         idle "ware"
         hover "ware2"
 
-        hotspot (300, 300, 900, 500) action Jump("game")
+        hotspot (300, 300, 900, 500) action Jump("game_1")
         hotspot (1, 750, 500, 330) action Jump("kitchen")
 
 label game_in_kitchen:
@@ -100,18 +102,13 @@ label game_in_kitchen:
     "За тарелками лежит что-то. Не могу достать."
     "Эти тарелки... они... они мне очень дороги."
     call screen plates 
-
 # === ИЗОБРАЖЕНИЯ ===
 image book1 = "images/book1.png"
 image book2 = "images/book2.png"
 image book3 = "images/book3.png"
-
-
 # === ИНИЦИАЛИЗАЦИЯ ===
 init:
     $ book_order = [3, 1, 2]  # Начальный порядок книг
-
-
 # === ПИТОНОВСКИЕ ФУНКЦИИ ===
 init python:
     def swap_books(i, j):
@@ -124,8 +121,6 @@ init python:
             renpy.jump("pic_in_kitchen")
         else:
             renpy.notify("Неверно! Попробуйте ещё раз.")
-
-
 # === ЭКРАН ИГРЫ ===
 screen book_game():
     # Книги (кликабельные изображения)
@@ -149,15 +144,11 @@ screen book_game():
         yanchor 0.5
         text "Проверить"
         action Function(check_solution)
-# === ЭКРАН ПОБЕДЫ ===
-
-
 # === ЛЕЙБЛЫ ===
-label game:
+label game_1:
     $ book_order = [3, 1, 2]
     show screen book_game
     pause
-
 
 label pic_in_kitchen:
     hide screen book_game
@@ -176,6 +167,31 @@ screen basement_map():
         hover "basement"
 
         hotspot (1, 900, 400, 180) action Jump("hallway")
+
+screen bathroom_map():
+    imagemap:
+        idle "bathroom"
+        hover "bathroom2"
+
+        hotspot (700, 200, 300, 350) action Jump("game_in_bathroom")
+        hotspot (1000, 900, 400, 180) action Jump("hallway")
+
+screen mirror_in_bath():
+    imagemap:
+        idle "mirror_in_bath"
+        hover "mirror_in_bath2"
+
+        hotspot (650, 1, 600, 750) action If(flag_for_mirror < 4, Notify("Кажется здесь не хватает кусочков зеркала."), Jump("mirror"))
+        hotspot (1400, 750, 520, 330) action Jump("bathroom")
+
+label game_in_bathroom:
+    scene mirror_in_bath
+    "Почему это зеркало разбито?"
+    call screen mirror_in_bath 
+
+
+
+
 
 #Bedroom — комната, где просыпается герой
 
@@ -197,12 +213,12 @@ label attic:
 label study:
 
 label kitchen:
-
     call screen kitchen_map
 
 label livingroom:
 
 label bathroom:
+    call screen bathroom_map
 
 label kidsbedroom:
 
