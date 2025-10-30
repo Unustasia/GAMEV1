@@ -1,4 +1,4 @@
-# Определение персонажей игры.
+﻿# Определение персонажей игры.
 define e = Character('Незнакомка', color="#291246")
 
 # Игра начинается здесь:
@@ -101,71 +101,72 @@ label game_in_kitchen:
     "Эти тарелки... они... они мне очень дороги."
     call screen plates 
 
-# Импортируем логику игры
-python:
-    from hanoi_logic import HanoiGame
-    game = HanoiGame()
+# === ИЗОБРАЖЕНИЯ ===
+image book1 = "images/book1.png"
+image book2 = "images/book2.png"
+image book3 = "images/book3.png"
 
-# Экран игры (разрешение 1920x1080)
-screen hanoi_game():
-    frame:
-        background "black.png"  # фон (должен быть в папке game/images/)
-        vbox:
-            text "Ханойская башня" size 48 color "#fff" xalign 0.5
-            text "Переместите все кольца на правый столб!" color "#ccc" xalign 0.5
-            text f"Ходы: {game.moves}" color "#fff" xalign 0.5
 
-            # Столбы с кольцами (ширина экрана ~1920, 3 столба + отступы)
-            hbox xalign 0.5 spacing 400:
-                for i in range(3):
-                    vbox:
-                        imagebutton:
-                            image "pole.png"  # изображение столба (ширина ~100px, высота ~500px)
-                            action Python("game.select_pole(%d)" % i)
-                        # Кольца (от нижнего к верхнему)
-                        for ring in reversed(game.poles[i]):
-                            image f"ring{ring}.png"  # изображения колец разного размера (ширина ~100-300px)
+# === ИНИЦИАЛИЗАЦИЯ ===
+init:
+    $ book_order = [3, 1, 2]  # Начальный порядок книг
 
-            # Кнопки управления (внизу экрана)
-            if game.selected_pole is None:
-                textbutton "Выбрать исходный столб" action Null()
-            else:
-                textbutton "Переместить →" xalign 0.5 ypos 800 action Python("result, message = game.move_ring(); renpy.notify(message); renpy.restart_interaction()")
 
-# Метка для проверки победы
-label check_win:
-    python:
-        if game.is_won():
-            renpy.notify(f"Победа! Вы решили задачу за {game.moves} ходов.")
-            jump game_over
+# === ПИТОНОВСКИЕ ФУНКЦИИ ===
+init python:
+    def swap_books(i, j):
+        """Меняет книги местами и проверяет победу."""
+        book_order[i], book_order[j] = book_order[j], book_order[i]
+        # Проверка победы сразу после обмена
+    def check_solution():
+        """Проверяет правильность расстановки и переходит к победе."""
+        if book_order == [1, 2, 3]:
+            renpy.jump("pic_in_kitchen")
         else:
-            jump continue_game
+            renpy.notify("Неверно! Попробуйте ещё раз.")
 
-# Метка завершения игры
-label game_over:
-    text "Игра завершена!" size 36 color "#fff" xalign 0.5
-    textbutton "Начать заново" action Python("game.reset(); renpy.restart_interaction()")
-    textbutton "Вернуться в меню" action Jump("main_menu")
 
-# Запуск игры
+# === ЭКРАН ИГРЫ ===
+screen book_game():
+    # Книги (кликабельные изображения)
+    imagebutton:
+        idle "book{}".format(book_order[0])
+        xpos 600 ypos 500
+        action Function(swap_books, 0, 1)  # 1 ↔ 2
+
+    imagebutton:
+        idle "book{}".format(book_order[1])
+        xpos 900 ypos 500
+        action Function(swap_books, 1, 2)  # 2 ↔ 3
+
+    imagebutton:
+        idle "book{}".format(book_order[2])
+        xpos 1200 ypos 500
+        action Function(swap_books, 0, 2)  # 1 ↔ 3
+    
+    button:
+        xpos 900 ypos 950  # Позиция кнопки (по центру внизу)
+        yanchor 0.5
+        text "Проверить"
+        action Function(check_solution)
+# === ЭКРАН ПОБЕДЫ ===
+
+
+# === ЛЕЙБЛЫ ===
 label game:
-    show screen hanoi_game()
-    jump check_win
-
-# Метка главного меню (пример)
-label game:
-    text "Меню" size 48 color "#fff" xalign 0.5
-    textbutton "Начать игру" action Jump("game")
-    textbutton "Выход" action Jump("quit")
+    $ book_order = [3, 1, 2]
+    show screen book_game
+    pause
 
 
 label pic_in_kitchen:
+    hide screen book_game
     scene black #shelf_end
-    show pic:
+    show pic_in_kitchen:
         xalign 0.45
         yalign 0.5
     "Ебать... газета.. нихуя себе"
-    hide pic
+    hide pic_in_kitchen
     $ flag_for_game_in_kitchen = 0
     jump kitchen
 
