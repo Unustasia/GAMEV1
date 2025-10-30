@@ -101,81 +101,72 @@ label game_in_kitchen:
     "Эти тарелки... они... они мне очень дороги."
     call screen plates 
 
-# Изображения книг и полки
+# === ИЗОБРАЖЕНИЯ ===
 image book1 = "images/book1.png"
 image book2 = "images/book2.png"
 image book3 = "images/book3.png"
-image shelf = "images/shelf.png"  # Фон-полка (1920×1080)
 
-# Инициализация игры
+
+# === ИНИЦИАЛИЗАЦИЯ ===
 init:
-    python:
-        def reset_game():
-            import random
-            global book_order
-            book_order = [1, 2, 3]
-            random.shuffle(book_order)  # Случайный порядок
-            global selected_book
-            selected_book = None  # Выбранная книга для обмена
+    $ book_order = [3, 1, 2]  # Начальный порядок книг
 
-        reset_game()
 
-# Экран головоломки
-screen book_puzzle():
-    # Фон — полка
-    add "shelf"
+# === ПИТОНОВСКИЕ ФУНКЦИИ ===
+init python:
+    def swap_books(i, j):
+        """Меняет книги местами и проверяет победу."""
+        book_order[i], book_order[j] = book_order[j], book_order[i]
+        # Проверка победы сразу после обмена
+    def check_solution():
+        """Проверяет правильность расстановки и переходит к победе."""
+        if book_order == [1, 2, 3]:
+            renpy.jump("pic_in_kitchen")
+        else:
+            renpy.notify("Неверно! Попробуйте ещё раз.")
 
-    # Позиции книг (горизонтально, центрировано)
-    $ x_pos = [600, 900, 1200]  # Координаты X для 3 книг
-    $ y = 500  # Координата Y
 
-    for i in range(3):
-        $ book_id = book_order[i]
-        $ img = "book{}".format(book_id)
-        $ x = x_pos[i]
+# === ЭКРАН ИГРЫ ===
+screen book_game():
+    # Книги (кликабельные изображения)
+    imagebutton:
+        idle "book{}".format(book_order[0])
+        xpos 600 ypos 500
+        action Function(swap_books, 0, 1)  # 1 ↔ 2
 
-        imagebutton:
-            idle img
-            hover img
-            xpos x
-            ypos y
-            action [SetVariable("selected_book", i), Call("swap_books")]
+    imagebutton:
+        idle "book{}".format(book_order[1])
+        xpos 900 ypos 500
+        action Function(swap_books, 1, 2)  # 2 ↔ 3
 
-    # Сообщение о победе
-    if book_order == [1, 2, 3]:
-        text "Победа!" size 60 color "#fff" xalign 0.5 yalign 0.3
+    imagebutton:
+        idle "book{}".format(book_order[2])
+        xpos 1200 ypos 500
+        action Function(swap_books, 0, 2)  # 1 ↔ 3
+    
+    button:
+        xpos 900 ypos 950  # Позиция кнопки (по центру внизу)
+        yanchor 0.5
+        text "Проверить"
+        action Function(check_solution)
+# === ЭКРАН ПОБЕДЫ ===
 
-        textbutton "Начать заново":
-            xalign 0.5
-            yalign 0.4
-            action [Python("reset_game()"), Redraw()]
 
-# Логика обмена книг
-label swap_books:
-    $ if selected_book is not None:
-        $ other_book = selected_book
-        $ selected_book = None
-
-        # Обмен позиций в списке
-        $ book_order[other_book], book_order[selected_book] = book_order[selected_book], book_order[other_book]
-        $ renpy.redraw()  # Перерисовка экрана
-
-    return
-
-# Запуск игры
-label start:
-    show screen book_puzzle
+# === ЛЕЙБЛЫ ===
+label game:
+    $ book_order = [3, 1, 2]
+    show screen book_game
     pause
 
 
-
 label pic_in_kitchen:
+    hide screen book_game
     scene black #shelf_end
-    show pic:
+    show pic_in_kitchen:
         xalign 0.45
         yalign 0.5
     "Ебать... газета.. нихуя себе"
-    hide pic
+    hide pic_in_kitchen
     $ flag_for_game_in_kitchen = 0
     jump kitchen
 
